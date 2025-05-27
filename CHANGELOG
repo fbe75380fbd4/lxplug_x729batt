@@ -1,3 +1,8 @@
+## 2.0.0
+
+- Refactored I2C device status logic
+- Updated documentation
+
 ## 1.0.0
 
 - Initial release

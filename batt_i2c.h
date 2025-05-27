@@ -38,16 +38,16 @@ union i2c_smbus_data
 /* Battery global data */
 typedef struct battery
 {
-    float voltage;  // Voltage reading from I2C
-    int percentage; // Capacity percentage reading from I2C
-    int state;      // I2C device state (present or unknown)
+    float voltage;      // Voltage reading from I2C device
+    int percentage;     // Capacity percentage reading from I2C device
+    int devicestatus;   // I2C device state (present or unknown)
 } battery;
 
 /* Prototypes */
 battery *battery_get();
 battery *battery_update(battery *b);
 int get_capacity();
-int get_state();
+int get_devicestatus();
 float get_voltage();
 
 #endif

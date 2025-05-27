@@ -4,38 +4,29 @@
 
 LXDE panel plug-in for Geekworm's x729 Raspberry Pi Hat.
 
-Features:
+## Features
 
-- Reads battery information from I2C interface
-- Displays battery voltage
-- Displays battery capacity/charge level
+- Reads battery information through I2C device interface
+- Displays tooltip with battery voltage and capacity/charge level
+- Displays low battery (<20%) and low voltage (<3.33V) warning notifications
 - Supported language(s): English only
 
-### Caveats
+## Caveats
 
 - No external power supply detection: Low battery warnings will continue to be displayed until charge level is above 20%.
 
-### Dependencies
+## Installation
 
 ```bash
 $ sudo apt -y install lxpanel-dev
-```
-
-### Build
-
-```bash
-$ cd /path/to/project
+$ git clone https://github.com/fbe75380fbd4/lxplug_x729batt.git
+$ cd lxplug_x729batt
 $ make
-```
-
-### Install
-
-```bash
 $ sudo make install
 $ lxpanelctl restart
 ```
 
-### Uninstall
+## Uninstallation
 
 ```bash
 $ sudo make uninstall

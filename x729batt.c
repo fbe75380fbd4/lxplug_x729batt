@@ -35,18 +35,18 @@ typedef struct
     guint vtimer;
 } x729BattPlugin;
 
-/* Battery states */
+/* Device status */
 typedef enum
 {
-    STAT_UNKNOWN = -1,
-    STAT_PRESENT = 1
-} status_t;
+    STATUS_UNKNOWN = 0,
+    STATUS_PRESENT = 1
+} devicestatus_t;
 
 /* Prototypes */
 static void convert_alpha(guchar *dest_data, int dest_stride, guchar *src_data, int src_stride, int src_x, int src_y, int width, int height);
 GdkPixbuf *gdk_pixbuf_get_from_surface(cairo_surface_t *surface, gint src_x, gint src_y, gint width, gint height);
 static int init_battery(x729BattPlugin *pt);
-static int update_battery(x729BattPlugin *pt, status_t *status);
+static int update_battery(x729BattPlugin *pt, devicestatus_t *status);
 static void draw_icon(x729BattPlugin *pt, int level);
 static void update_icon(x729BattPlugin *pt);
 static gboolean timer_event(x729BattPlugin *pt);
@@ -114,9 +114,9 @@ static int init_battery(x729BattPlugin *pt)
 }
 
 /* Update battery and voltage levels */
-static int update_battery(x729BattPlugin *pt, status_t *status)
+static int update_battery(x729BattPlugin *pt, devicestatus_t *status)
 {
-    *status = STAT_UNKNOWN;
+    *status = STATUS_UNKNOWN;
     battery *b = pt->batt;
     if (b)
     {
@@ -125,7 +125,7 @@ static int update_battery(x729BattPlugin *pt, status_t *status)
         if (b->percentage <= 20)
             lxpanel_notify(pt->panel, "WARNING: Low battery detected!\nPlease verify your power supply.");
 
-        *status = (status_t)b->state;
+        *status = (devicestatus_t)b->devicestatus;
         return 1;
     }
 
@@ -226,19 +226,19 @@ static void draw_icon(x729BattPlugin *pt, int level)
     cairo_destroy(cr);
 }
 
-/* Read the current charge state and update the icon accordingly */
+/* Read the current battery status and update the icon accordingly */
 static void update_icon(x729BattPlugin *pt)
 {
     float voltage;
     int capacity;
-    status_t status;
+    devicestatus_t status;
     char str[255];
 
     if (!pt->timer)
         return;
 
     // Update battery capacity and voltage levels
-    if (!update_battery(pt, &status) | (status == STAT_UNKNOWN))
+    if (!update_battery(pt, &status) | (status == STATUS_UNKNOWN))
         return;
 
     battery *b = pt->batt;
@@ -264,10 +264,10 @@ static gboolean timer_event(x729BattPlugin *pt)
 static gboolean vtimer_event(x729BattPlugin *pt)
 {
     float voltage = get_voltage();
-    status_t status = (status_t)get_state();
+    devicestatus_t status = (devicestatus_t)get_devicestatus();
 
     // Threshold for battery voltage
-    if ((status == STAT_PRESENT) & (voltage < 3.33))
+    if ((status == STATUS_PRESENT) & (voltage < 3.33))
     {
         lxpanel_notify(pt->panel, "WARNING: Low voltage detected!\nPlease verify your power supply.");
         return TRUE;

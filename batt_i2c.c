@@ -29,7 +29,7 @@ battery *battery_new()
 	battery *b = g_new0(battery, 1);
 
 	b->voltage = 0.0;
-	b->state = -1;
+	b->devicestatus = 0;
 	b->percentage = 0;
 
 	return b;
@@ -172,25 +172,25 @@ float get_voltage()
 	return voltage;
 }
 
-/* Returns battery state */
-int get_state()
+/* Returns device status */
+int get_devicestatus()
 {
 	if (open_i2c() < 0)
-		return -1; // Unknown
+		return 0; // Unknown
 
 	g_info("x729 is present.");
 
 	return 1; // Present
 }
 
-/* Updates battery state, voltage and capacity */
+/* Updates device status, voltage and capacity */
 battery *battery_update(battery *b)
 {
 	if (b == NULL)
 		b = battery_new();
 
-	b->state = get_state();
-	if (b->state != 1)
+	b->devicestatus = get_devicestatus();
+	if (b->devicestatus != 1)
 		g_error("x729 battery not found!");
 
 	b->voltage = get_voltage();
