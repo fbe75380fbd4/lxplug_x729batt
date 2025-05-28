@@ -19,7 +19,9 @@
                 "x729batt.so",
                 "`pkg-config",
                 "--libs",
-                "lxpanel`"
+                "lxpanel`",
+                "-l",
+                "wiringPi"
             ],
             "options": {
                 "cwd": "${fileDirname}"

@@ -6,14 +6,10 @@ LXDE panel plug-in for Geekworm's x729 Raspberry Pi Hat.
 
 ## Features
 
-- Reads battery information through I2C device interface
-- Displays tooltip with battery voltage and capacity/charge level
-- Displays low battery (<20%) and low voltage (<3.33V) warning notifications
+- Reads battery information through I2C and GPIO device interfaces
+- Displays tooltip with battery voltage, capacity/charge level and power source
+- Displays low battery (<20%) and low voltage (<3.33V) warning notifications while running on battery
 - Supported language(s): English only
-
-## Caveats
-
-- No external power supply detection: Low battery warnings will continue to be displayed until charge level is above 20%.
 
 ## Installation
 
@@ -21,7 +17,6 @@ LXDE panel plug-in for Geekworm's x729 Raspberry Pi Hat.
 $ sudo apt -y install lxpanel-dev
 $ git clone https://github.com/fbe75380fbd4/lxplug_x729batt.git
 $ cd lxplug_x729batt
-$ make
 $ sudo make install
 $ lxpanelctl restart
 ```
@@ -33,7 +28,7 @@ $ sudo make uninstall
 $ lxpanelctl restart
 ```
 
-## Requirements
+## Dependencies
 
 ### I2C
 
@@ -89,6 +84,21 @@ Battery:   93%
 ...
 ```
 
+### WiringPi
+
+1. Install library from source by following these [steps](https://github.com/WiringPi/WiringPi?tab=readme-ov-file#from-source)
+2. Run command `gpio readall`
+3. Confirm BCM pin 6 shows value `1` when AC adapter is disconnected from x729
+
+```bash
+ +-----+-----+---------+------+---+---Pi 4B--+---+------+---------+-----+-----+
+ | BCM | wPi |   Name  | Mode | V | Physical | V | Mode | Name    | wPi | BCM |
+ +-----+-----+---------+------+---+----++----+---+------+---------+-----+-----+
+ ...
+ |   6 |  22 | GPIO.22 |   IN | 1 | 31 || 32 | 1 | OUT  | GPIO.26 | 26  | 12  |
+ ...
+```
+
 ## References
 
 - https://wiki.geekworm.com/X729
@@ -97,3 +107,5 @@ Battery:   93%
 - https://github.com/omapconf/omapconf/tree/master/i2c-tools
 - https://github.com/raspberrypi-ui/lxplug-ptbatt/
 - https://web.archive.org/web/20220422124713/https://wiki.lxde.org/en/How_to_write_plugins_for_LXPanel
+- https://github.com/WiringPi/WiringPi
+- https://github.com/geekworm-com/x729-script/blob/main/sample/pld.py

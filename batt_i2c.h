@@ -29,6 +29,8 @@
 #define I2C_SMBUS_WORD_DATA 3                    // I2C WORD DATA TYPE
 #define I2C_FUNC_SMBUS_READ_WORD_DATA 0x00200000 // I2C READ WORD DATA CAPABILITY
 
+#define BCM_GPIO_PIN 6 // BCM numbering for GPIO register
+
 /* SMBus response message */
 union i2c_smbus_data
 {
@@ -41,6 +43,7 @@ typedef struct battery
     float voltage;      // Voltage reading from I2C device
     int percentage;     // Capacity percentage reading from I2C device
     int devicestatus;   // I2C device state (present or unknown)
+    int powersource;    // Running on battery or power supply
 } battery;
 
 /* Prototypes */
@@ -48,6 +51,7 @@ battery *battery_get();
 battery *battery_update(battery *b);
 int get_capacity();
 int get_devicestatus();
+int get_powersource();
 float get_voltage();
 
 #endif

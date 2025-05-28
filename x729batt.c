@@ -42,6 +42,13 @@ typedef enum
     STATUS_PRESENT = 1
 } devicestatus_t;
 
+/* Power source */
+typedef enum
+{
+    POW_ADAPTER = 0,
+    POW_BATTERY = 1
+} powersource_t;
+
 /* Prototypes */
 static void convert_alpha(guchar *dest_data, int dest_stride, guchar *src_data, int src_stride, int src_x, int src_y, int width, int height);
 GdkPixbuf *gdk_pixbuf_get_from_surface(cairo_surface_t *surface, gint src_x, gint src_y, gint width, gint height);
@@ -122,7 +129,7 @@ static int update_battery(x729BattPlugin *pt, devicestatus_t *status)
     {
         battery_update(b);
 
-        if (b->percentage <= 20)
+        if ((b->percentage <= 20) & ((powersource_t)b->powersource == POW_BATTERY))
             lxpanel_notify(pt->panel, "WARNING: Low battery detected!\nPlease verify your power supply.");
 
         *status = (devicestatus_t)b->devicestatus;
@@ -231,6 +238,7 @@ static void update_icon(x729BattPlugin *pt)
 {
     float voltage;
     int capacity;
+    powersource_t powersource;
     devicestatus_t status;
     char str[255];
 
@@ -244,9 +252,13 @@ static void update_icon(x729BattPlugin *pt)
     battery *b = pt->batt;
     capacity = b->percentage;
     voltage = b->voltage;
+    powersource = (powersource_t)b->powersource;
 
     // fill the battery symbol and create the tooltip
-    sprintf(str, "Capacity : %01d%%\nVoltage : %02.02fV", capacity, voltage);
+    if (powersource == POW_BATTERY)
+        sprintf(str, "Capacity : %01d%%\nVoltage : %02.02fV\nPower source : Battery", capacity, voltage);
+    else
+        sprintf(str, "Capacity : %01d%%\nVoltage : %02.02fV\nPower source : AC adapter", capacity, voltage);
     draw_icon(pt, capacity);
 
     // set the tooltip
@@ -265,9 +277,10 @@ static gboolean vtimer_event(x729BattPlugin *pt)
 {
     float voltage = get_voltage();
     devicestatus_t status = (devicestatus_t)get_devicestatus();
+    powersource_t powersource = (powersource_t)get_powersource();
 
     // Threshold for battery voltage
-    if ((status == STATUS_PRESENT) & (voltage < 3.33))
+    if ((status == STATUS_PRESENT) & (voltage < 3.33) & (powersource == POW_BATTERY))
     {
         lxpanel_notify(pt->panel, "WARNING: Low voltage detected!\nPlease verify your power supply.");
         return TRUE;

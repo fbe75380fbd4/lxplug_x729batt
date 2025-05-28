@@ -9,7 +9,10 @@
         "/usr/include/pango-1.0/",
         "/usr/lib/aarch64-linux-gnu/glib-2.0/include/",
         "/usr/lib/aarch64-linux-gnu/gtk-2.0/include/",
-    ]
+    ],
+    "files.associations": {
+        "batt_i2c.h": "c"
+    }
 }
     
     

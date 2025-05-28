@@ -1,5 +1,5 @@
 x729batt.so:
-	gcc -s -Wall `pkg-config --cflags gtk+-3.0 lxpanel` -shared -fPIC x729batt.c batt_i2c.c -o x729batt.so `pkg-config --libs lxpanel`
+	gcc -s -Wall `pkg-config --cflags gtk+-3.0 lxpanel` -shared -fPIC x729batt.c batt_i2c.c -o x729batt.so `pkg-config --libs lxpanel` -l wiringPi
 
 clean:
 	rm -rf *.so

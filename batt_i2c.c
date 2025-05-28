@@ -22,6 +22,7 @@
 #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <wiringPi.h>
 
 /* Creates a new battery object */
 battery *battery_new()
@@ -31,6 +32,7 @@ battery *battery_new()
 	b->voltage = 0.0;
 	b->devicestatus = 0;
 	b->percentage = 0;
+	b->powersource = 0;
 
 	return b;
 }
@@ -183,6 +185,28 @@ int get_devicestatus()
 	return 1; // Present
 }
 
+/* Returns power source */
+int get_powersource()
+{
+	// uses BCM numbering of the GPIOs and directly accesses the GPIO registers.
+	wiringPiSetupGpio();
+
+  	// set BCM GPIO pin to input
+  	pinMode(BCM_GPIO_PIN, INPUT);
+
+  	// get state BCM GPIO pin
+  	int value = digitalRead(BCM_GPIO_PIN);
+
+  	if (HIGH == value)
+  	{
+		g_info("x729 is running on battery.");
+		return 1;
+  	}
+	
+	g_info("x729 is running on AC adapter.");
+	return 0;
+}
+
 /* Updates device status, voltage and capacity */
 battery *battery_update(battery *b)
 {
@@ -198,6 +222,8 @@ battery *battery_update(battery *b)
 	b->percentage = get_capacity();
 	if (b->percentage > 100)
 		b->percentage = 100;
+
+	b->powersource = get_powersource();
 
 	return b;
 }
