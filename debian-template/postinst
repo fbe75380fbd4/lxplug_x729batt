@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+# Ensure conformance with Debian maintscript policy
+if [ "$1" = "configure" ]; then
+  # set desired permissions and ownership
+  chmod 644 /usr/lib/aarch64-linux-gnu/lxpanel/plugins/x729batt.so || true
+  chown root:root /usr/lib/aarch64-linux-gnu/lxpanel/plugins/x729batt.so || true
+
+  # restart or reload lxpanel service to apply changes
+  if command -v lxpanelctl >/dev/null 2>&1; then
+    lxpanelctl restart || true
+  fi
+fi
+
+exit 0

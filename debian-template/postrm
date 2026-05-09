@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  remove|purge)
+    if command -v lxpanelctl >/dev/null 2>&1; then
+      lxpanelctl restart || true
+    fi
+    ;;
+esac
+
+exit 0

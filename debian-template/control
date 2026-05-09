@@ -1,0 +1,13 @@
+Source: lxplug-x729batt
+Section: libs
+Priority: optional
+Maintainer: Enrique M <tyranitar.spider419@passinbox.com> 
+Standards-Version: 4.5.1
+Build-Depends: debhelper-compat (= 13)
+
+Package: lxplug-x729batt
+Architecture: arm64
+Depends: ${misc:Depends}, lxpanel, libc6
+Description: LXDE panel plug-in for Geekworm's x729 Raspberry Pi Hat
+ Provides battery monitoring for Geekworm’s x729 Raspberry Pi Hat
+ by reading data via I2C and GPIO.

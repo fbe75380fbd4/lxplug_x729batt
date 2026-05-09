@@ -20,6 +20,11 @@ jobs:
         run: bash ./scripts/build.sh
         shell: bash
 
+      - name: Generate .deb package
+        run: bash ./scripts/build-deb.sh
+        env:
+          DEB_VERSION: ${{ steps.version.outputs.version }}
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -28,8 +33,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            x729batt.so
-            LICENSE
-            README.md
+            *.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,6 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_shlibdeps:
+	# Skip automatic shlibdeps because liblxpanel is not packaged
