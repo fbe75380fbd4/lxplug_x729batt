@@ -16,6 +16,7 @@
  *
  */
 
+#include "version.h"
 #include "batt_i2c.h"
 
 #include "lxpanel/plugin.h"

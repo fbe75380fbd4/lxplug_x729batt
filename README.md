@@ -11,10 +11,14 @@ LXDE panel plug-in for Geekworm's x729 Raspberry Pi Hat.
 - Displays low battery (<20%) and low voltage (<3.33V) warning notifications while running on battery
 - Supported language(s): English only
 
+## Dependencies
+
+- [WiringPi](#WiringPi)
+
 ## Installation
 
 ```bash
-$ sudo apt -y install lxpanel-dev
+$ sudo apt -y install lxpanel-dev libgtk-3-dev libi2c-dev libc6-dev libglib2.0-dev wiringpi
 $ git clone https://github.com/fbe75380fbd4/lxplug_x729batt.git
 $ cd lxplug_x729batt
 $ sudo make install
