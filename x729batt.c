@@ -130,7 +130,7 @@ static int update_battery(x729BattPlugin *pt, devicestatus_t *status)
     {
         battery_update(b);
 
-        if ((b->percentage <= 20) & ((powersource_t)b->powersource == POW_BATTERY))
+        if ((b->percentage <= 20) && ((powersource_t)b->powersource == POW_BATTERY))
             lxpanel_notify(pt->panel, "WARNING: Low battery detected!\nPlease verify your power supply.");
 
         *status = (devicestatus_t)b->devicestatus;
@@ -247,7 +247,7 @@ static void update_icon(x729BattPlugin *pt)
         return;
 
     // Update battery capacity and voltage levels
-    if (!update_battery(pt, &status) | (status == STATUS_UNKNOWN))
+    if (!update_battery(pt, &status) || (status == STATUS_UNKNOWN))
         return;
 
     battery *b = pt->batt;
@@ -281,7 +281,7 @@ static gboolean vtimer_event(x729BattPlugin *pt)
     powersource_t powersource = (powersource_t)get_powersource();
 
     // Threshold for battery voltage
-    if ((status == STATUS_PRESENT) & (voltage < 3.33) & (powersource == POW_BATTERY))
+    if ((status == STATUS_PRESENT) && (voltage < 3.33) && (powersource == POW_BATTERY))
     {
         lxpanel_notify(pt->panel, "WARNING: Low voltage detected!\nPlease verify your power supply.");
         return TRUE;
