@@ -31,6 +31,10 @@
 
 #define BCM_GPIO_PIN 6 // BCM numbering for GPIO register
 
+#define VOLTAGE_REGISTER_LSB_MILLIVOLTS 1.25
+#define MILLIVOLTS_PER_VOLT 1000.0
+#define VOLTAGE_REGISTER_SCALE 16.0
+
 /* SMBus response message */
 union i2c_smbus_data
 {
@@ -42,16 +46,16 @@ typedef struct battery
 {
     float voltage;      // Voltage reading from I2C device
     int percentage;     // Capacity percentage reading from I2C device
-    int devicestatus;   // I2C device state (present or unknown)
-    int powersource;    // Running on battery or power supply
+    int device_status;  // I2C device state (present or unknown)
+    int power_source;   // Running on battery or power supply
 } battery;
 
 /* Prototypes */
 battery *battery_get();
 int battery_update(battery *b);
 int get_capacity();
-int get_devicestatus();
-int get_powersource();
+int get_device_status();
+int get_power_source();
 float get_voltage();
 
 #endif

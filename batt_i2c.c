@@ -37,20 +37,20 @@ static enum
 	GPIO_SETUP_READY
 } gpio_setup_state;
 
-/* Creates a new battery object */
+/* Allocates a battery record with zeroed readings. */
 battery *battery_new()
 {
 	battery *b = g_new0(battery, 1);
 
 	b->voltage = 0.0;
-	b->devicestatus = 0;
+	b->device_status = 0;
 	b->percentage = 0;
-	b->powersource = 0;
+	b->power_source = 0;
 
 	return b;
 }
 
-/* Verify access to I2C device file */
+/* Opens the configured I2C bus and reports open errors. */
 static int open_i2c()
 {
 	char filename[20];
@@ -74,7 +74,7 @@ static int open_i2c()
 	return file;
 }
 
-/* Verify read capability and address access on I2C device */
+/* Checks SMBus word-read support and selects the battery device address. */
 static int read_i2c(int file)
 {
 	unsigned long funcs;
@@ -105,7 +105,7 @@ static int read_i2c(int file)
 	return 0;
 }
 
-/* Retrieves registry data as word (32 bit signed integer) */
+/* Reads one SMBus word from the selected device register. */
 static __s32 get_i2c_data(int file, unsigned int daddress)
 {
 	union i2c_smbus_data data;
@@ -122,7 +122,7 @@ static __s32 get_i2c_data(int file, unsigned int daddress)
 		return 0x0FFFF & data.word;
 }
 
-/* Reads data from registry address */
+/* Opens the bus, reads a register, and closes the bus on every path. */
 static int i2c_read_raw(unsigned int daddress, unsigned int *data)
 {
 	int res, file;
@@ -156,13 +156,13 @@ static int i2c_read_raw(unsigned int daddress, unsigned int *data)
 	return 0;
 }
 
-/* Swaps leftmost bits with rightmost bits */
+/* Swaps the byte order of a 16-bit device reading. */
 static unsigned int swap_data(unsigned int data)
 {
 	return ((data & 0x00FF) << 8) | ((data & 0xFF00) >> 8);
 }
 
-/* Returns battery capacity */
+/* Reads and converts the battery capacity percentage. */
 int get_capacity()
 {
 	int capacity = 0;
@@ -179,7 +179,7 @@ int get_capacity()
 	return capacity;
 }
 
-/* Returns battery voltage */
+/* Reads and converts the battery voltage to volts. */
 float get_voltage()
 {
 	float voltage = 0.0;
@@ -189,15 +189,16 @@ float get_voltage()
 	if (result < 0)
 		return (result);
 
-	voltage = (swap_data(data) * 1.25 / 1000 / 16);
+	voltage = (swap_data(data) * VOLTAGE_REGISTER_LSB_MILLIVOLTS /
+		   MILLIVOLTS_PER_VOLT / VOLTAGE_REGISTER_SCALE);
 
 	g_info("x729 battery voltage: %02.02fV.", voltage);
 
 	return voltage;
 }
 
-/* Returns device status */
-int get_devicestatus()
+/* Reports whether the battery device responds on the configured I2C bus. */
+int get_device_status()
 {
 	int file = open_i2c();
 	if (file < 0)
@@ -211,8 +212,8 @@ int get_devicestatus()
 	return 1; // Present
 }
 
-/* Returns power source */
-int get_powersource()
+/* Reads the GPIO input to identify battery or AC power. */
+int get_power_source()
 {
 	if (gpio_setup_state == GPIO_SETUP_NOT_ATTEMPTED)
 	{
@@ -243,13 +244,13 @@ int get_powersource()
 	return 0;
 }
 
-/* Updates device status, voltage and capacity */
+/* Refreshes all battery readings; returns false if required data is unavailable. */
 int battery_update(battery *b)
 {
 	g_return_val_if_fail(b != NULL, 0);
 
-	b->devicestatus = get_devicestatus();
-	if (b->devicestatus != 1)
+	b->device_status = get_device_status();
+	if (b->device_status != 1)
 		return 0;
 
 	float voltage = get_voltage();
@@ -268,12 +269,12 @@ int battery_update(battery *b)
 
 	b->voltage = voltage;
 	b->percentage = percentage > 100 ? 100 : percentage;
-	b->powersource = get_powersource();
+	b->power_source = get_power_source();
 
 	return 1;
 }
 
-/* Retrieves battery information */
+/* Creates and initializes a battery record, or frees it if initialization fails. */
 battery *battery_get()
 {
 	battery *b = battery_new();

@@ -23,6 +23,20 @@
 
 #define CMON_INTERVAL 60000
 #define VMON_INTERVAL 60000
+#define LOW_VOLTAGE_WARNING_VOLTS 3.33f
+#define TOOLTIP_BUFFER_SIZE 255
+
+enum
+{
+    LOW_BATTERY_PERCENT = 20,
+    MEDIUM_BATTERY_PERCENT = 50,
+    ICON_BASE_WIDTH = 36,
+    ICON_HEIGHT_RATIO = 10,
+    ICON_HEIGHT_EVEN_FACTOR = 2,
+    ICON_MIN_HEIGHT = 18,
+    ICON_FILL_FULL_PERCENT = 97,
+    ICON_FILL_WIDTH_INSET = 12
+};
 
 /* Plug-in global data */
 typedef struct
@@ -41,26 +55,25 @@ typedef enum
 {
     STATUS_UNKNOWN = 0,
     STATUS_PRESENT = 1
-} devicestatus_t;
+} device_status_t;
 
 /* Power source */
 typedef enum
 {
     POW_ADAPTER = 0,
     POW_BATTERY = 1
-} powersource_t;
+} power_source_t;
 
 /* Prototypes */
 static gboolean convert_alpha(guchar *dest_data, int dest_stride, guchar *src_data, int src_stride, int src_x, int src_y, int width, int height);
-GdkPixbuf *gdk_pixbuf_get_from_surface(cairo_surface_t *surface, gint src_x, gint src_y, gint width, gint height);
-static int init_battery(x729BattPlugin *pt);
-static int update_battery(x729BattPlugin *pt, devicestatus_t *status);
-static void draw_icon(x729BattPlugin *pt, int level);
-static void update_icon(x729BattPlugin *pt);
-static gboolean timer_event(x729BattPlugin *pt);
-static gboolean vtimer_event(x729BattPlugin *pt);
+static int init_battery(x729BattPlugin *plugin);
+static int update_battery(x729BattPlugin *plugin, device_status_t *status);
+static void draw_icon(x729BattPlugin *plugin, int level);
+static void update_icon(x729BattPlugin *plugin);
+static gboolean timer_event(x729BattPlugin *plugin);
+static gboolean vtimer_event(x729BattPlugin *plugin);
 
-/* gdk_pixbuf_get_from_surface function from GDK+3 */
+/* Converts premultiplied Cairo pixels into the pixbuf's pixel layout. */
 static gboolean convert_alpha(guchar *dest_data, int dest_stride, guchar *src_data, int src_stride, int src_x, int src_y, int width, int height)
 {
     int x, y;
@@ -126,8 +139,8 @@ static gboolean convert_alpha(guchar *dest_data, int dest_stride, guchar *src_da
     return TRUE;
 }
 
-/* TBD */
-GdkPixbuf *gdk_pixbuf_get_from_surface(cairo_surface_t *surface, gint src_x, gint src_y, gint width, gint height)
+/* Converts an image-surface region to a pixbuf and consumes the surface. */
+static GdkPixbuf *pixbuf_from_cairo_surface(cairo_surface_t *surface, gint src_x, gint src_y, gint width, gint height)
 {
     GdkPixbuf *dest;
 
@@ -165,51 +178,53 @@ GdkPixbuf *gdk_pixbuf_get_from_surface(cairo_surface_t *surface, gint src_x, gin
     return dest;
 }
 
-/* Initial check for battery */
-static int init_battery(x729BattPlugin *pt)
+/* Reads initial battery data and stores it in the plugin context. */
+static int init_battery(x729BattPlugin *plugin)
 {
-    pt->batt = battery_get();
-    if (pt->batt)
+    plugin->batt = battery_get();
+    if (plugin->batt)
         return 1;
 
     return 0;
 }
 
-/* Update battery and voltage levels */
-static int update_battery(x729BattPlugin *pt, devicestatus_t *status)
+/* Refreshes battery data and reports its device status. */
+static int update_battery(x729BattPlugin *plugin, device_status_t *status)
 {
     *status = STATUS_UNKNOWN;
-    battery *b = pt->batt;
+    battery *b = plugin->batt;
     if (b)
     {
         if (!battery_update(b))
             return 0;
 
-        if ((b->percentage <= 20) && ((powersource_t)b->powersource == POW_BATTERY))
-            lxpanel_notify(pt->panel, "WARNING: Low battery detected!\nPlease verify your power supply.");
+        if ((b->percentage <= LOW_BATTERY_PERCENT) &&
+            ((power_source_t)b->power_source == POW_BATTERY))
+            lxpanel_notify(plugin->panel, "WARNING: Low battery detected!\nPlease verify your power supply.");
 
-        *status = (devicestatus_t)b->devicestatus;
+        *status = (device_status_t)b->device_status;
         return 1;
     }
 
     return 0;
 }
 
-/* Draw the icon in relevant colour and fill level */
-static void draw_icon(x729BattPlugin *pt, int level)
+/* Draws the battery icon using the capacity-dependent color and fill level. */
+static void draw_icon(x729BattPlugin *plugin, int level)
 {
     float r, g, b;
     int h, w, f, ic;
 
     // calculate dimensions based on icon size
-    ic = panel_get_icon_size(pt->panel);
+    ic = panel_get_icon_size(plugin->panel);
     if (ic <= 10)
         return;
 
-    w = ic < 36 ? 36 : ic;
-    gint64 height = ((gint64)w * 10 / 36) * 2;
-    if (height < 18)
-        height = 18;
+    w = ic < ICON_BASE_WIDTH ? ICON_BASE_WIDTH : ic;
+    gint64 height = ((gint64)w * ICON_HEIGHT_RATIO / ICON_BASE_WIDTH) *
+                    ICON_HEIGHT_EVEN_FACTOR;
+    if (height < ICON_MIN_HEIGHT)
+        height = ICON_MIN_HEIGHT;
     if (height >= ic)
         height = ic - 2;
     if (height <= 8 || height > G_MAXINT)
@@ -217,14 +232,14 @@ static void draw_icon(x729BattPlugin *pt, int level)
     h = (gint)height;
 
     // set color based on level
-    if (level <= 20)
+    if (level <= LOW_BATTERY_PERCENT)
     {
         // RGB: 242,0,14
         r = 0.95;
         g = 0.0;
         b = 0.05;
     }
-    else if (level <= 50)
+    else if (level <= MEDIUM_BATTERY_PERCENT)
     {
         // RGB: 255,158,1
         r = 1;
@@ -284,20 +299,21 @@ static void draw_icon(x729BattPlugin *pt, int level)
     // fill the battery
     if (level < 0)
         f = 0;
-    else if (level > 97)
-        f = w - 12;
+    else if (level > ICON_FILL_FULL_PERCENT)
+        f = w - ICON_FILL_WIDTH_INSET;
     else
     {
-        f = (gint)(((gint64)(w - 12) * level) / 97);
-        if (f > w - 12)
-            f = w - 12;
+        f = (gint)(((gint64)(w - ICON_FILL_WIDTH_INSET) * level) /
+                   ICON_FILL_FULL_PERCENT);
+        if (f > w - ICON_FILL_WIDTH_INSET)
+            f = w - ICON_FILL_WIDTH_INSET;
     }
     cairo_set_source_rgb(cr, r, g, b);
     cairo_rectangle(cr, 5, 4, f, h - 8);
     cairo_fill(cr);
 
     // create a pixbuf from the cairo surface
-    GdkPixbuf *pixbuf = gdk_pixbuf_get_from_surface(surface, 0, 0, w, h);
+    GdkPixbuf *pixbuf = pixbuf_from_cairo_surface(surface, 0, 0, w, h);
     if (!pixbuf)
     {
         cairo_destroy(cr);
@@ -305,130 +321,130 @@ static void draw_icon(x729BattPlugin *pt, int level)
     }
 
     // copy the pixbuf to the icon resource
-    g_object_ref_sink(pt->tray_icon);
-    gtk_image_set_from_pixbuf(GTK_IMAGE(pt->tray_icon), pixbuf);
+    g_object_ref_sink(plugin->tray_icon);
+    gtk_image_set_from_pixbuf(GTK_IMAGE(plugin->tray_icon), pixbuf);
 
     g_object_unref(pixbuf);
     cairo_destroy(cr);
 }
 
-/* Read the current battery status and update the icon accordingly */
-static void update_icon(x729BattPlugin *pt)
+/* Refreshes the icon and tooltip from the latest battery readings. */
+static void update_icon(x729BattPlugin *plugin)
 {
     float voltage;
     int capacity;
-    powersource_t powersource;
-    devicestatus_t status;
-    char str[255];
+    power_source_t power_source;
+    device_status_t status;
+    char str[TOOLTIP_BUFFER_SIZE];
 
-    if (!pt->timer)
+    if (!plugin->timer)
         return;
 
     // Update battery capacity and voltage levels
-    if (!update_battery(pt, &status) || (status == STATUS_UNKNOWN))
+    if (!update_battery(plugin, &status) || (status == STATUS_UNKNOWN))
         return;
 
-    battery *b = pt->batt;
+    battery *b = plugin->batt;
     capacity = b->percentage;
     voltage = b->voltage;
-    powersource = (powersource_t)b->powersource;
+    power_source = (power_source_t)b->power_source;
 
     // fill the battery symbol and create the tooltip
-    if (powersource == POW_BATTERY)
+    if (power_source == POW_BATTERY)
         snprintf(str, sizeof(str), "Capacity : %01d%%\nVoltage : %02.02fV\nPower source : Battery", capacity, voltage);
-    else if (powersource == POW_ADAPTER)
+    else if (power_source == POW_ADAPTER)
         snprintf(str, sizeof(str), "Capacity : %01d%%\nVoltage : %02.02fV\nPower source : AC adapter", capacity, voltage);
     else
         snprintf(str, sizeof(str), "Capacity : %01d%%\nVoltage : %02.02fV\nPower source : Unknown", capacity, voltage);
-    draw_icon(pt, capacity);
+    draw_icon(plugin, capacity);
 
     // set the tooltip
-    gtk_widget_set_tooltip_text(pt->tray_icon, str);
+    gtk_widget_set_tooltip_text(plugin->tray_icon, str);
 }
 
-/* Updates battery icon after timeout. */
-static gboolean timer_event(x729BattPlugin *pt)
+/* Timer callback that refreshes the battery icon. */
+static gboolean timer_event(x729BattPlugin *plugin)
 {
-    update_icon(pt);
+    update_icon(plugin);
     return TRUE;
 }
 
-/* Warns if low voltage from power supply is detected after timeout. */
-static gboolean vtimer_event(x729BattPlugin *pt)
+/* Timer callback that warns when battery voltage falls below its threshold. */
+static gboolean vtimer_event(x729BattPlugin *plugin)
 {
     float voltage = get_voltage();
     if (voltage < 0.0f)
         return TRUE;
 
-    devicestatus_t status = (devicestatus_t)get_devicestatus();
-    powersource_t powersource = (powersource_t)get_powersource();
+    device_status_t status = (device_status_t)get_device_status();
+    power_source_t power_source = (power_source_t)get_power_source();
 
     // Threshold for battery voltage
-    if ((status == STATUS_PRESENT) && (voltage < 3.33) && (powersource == POW_BATTERY))
+    if ((status == STATUS_PRESENT) && (voltage < LOW_VOLTAGE_WARNING_VOLTS) &&
+        (power_source == POW_BATTERY))
     {
-        lxpanel_notify(pt->panel, "WARNING: Low voltage detected!\nPlease verify your power supply.");
+        lxpanel_notify(plugin->panel, "WARNING: Low voltage detected!\nPlease verify your power supply.");
         return TRUE;
     }
 
     return FALSE;
 }
 
-/* Plugin destructor. */
+/* Removes plugin timers and releases its context. */
 static void x729batt_destructor(gpointer user_data)
 {
-    x729BattPlugin *pt = (x729BattPlugin *)user_data;
+    x729BattPlugin *plugin = (x729BattPlugin *)user_data;
 
     /* Disconnect battery timer. */
-    if (pt->timer)
-        g_source_remove(pt->timer);
+    if (plugin->timer)
+        g_source_remove(plugin->timer);
 
     /* Disconnect voltage timer. */
-    if (pt->vtimer)
-        g_source_remove(pt->vtimer);
+    if (plugin->vtimer)
+        g_source_remove(plugin->vtimer);
 
     /* Deallocate memory */
-    g_free(pt);
+    g_free(plugin);
 }
 
-/* Plugin constructor. */
+/* Creates the plugin widget, initializes readings, and starts monitoring. */
 static GtkWidget *x729batt_constructor(LXPanel *panel, config_setting_t *settings)
 {
     /* Allocate and initialize plugin context */
-    x729BattPlugin *pt = g_new0(x729BattPlugin, 1);
+    x729BattPlugin *plugin = g_new0(x729BattPlugin, 1);
 
     /* Allocate top level widget and set into plugin widget pointer. */
-    pt->panel = panel;
-    pt->settings = settings;
-    pt->plugin = gtk_event_box_new();
-    lxpanel_plugin_set_data(pt->plugin, pt, x729batt_destructor);
+    plugin->panel = panel;
+    plugin->settings = settings;
+    plugin->plugin = gtk_event_box_new();
+    lxpanel_plugin_set_data(plugin->plugin, plugin, x729batt_destructor);
 
     /* Allocate icon as a child of top level */
-    pt->tray_icon = gtk_image_new();
-    gtk_container_add(GTK_CONTAINER(pt->plugin), pt->tray_icon);
+    plugin->tray_icon = gtk_image_new();
+    gtk_container_add(GTK_CONTAINER(plugin->plugin), plugin->tray_icon);
 
-    if (init_battery(pt))
+    if (init_battery(plugin))
     {
         /* Start timed events to monitor status */
-        pt->timer = g_timeout_add(CMON_INTERVAL, (GSourceFunc)timer_event, (gpointer)pt);
+        plugin->timer = g_timeout_add(CMON_INTERVAL, (GSourceFunc)timer_event, (gpointer)plugin);
 
         /* Start timed events to monitor low voltage warnings */
-        pt->vtimer = g_timeout_add(VMON_INTERVAL, (GSourceFunc)vtimer_event, (gpointer)pt);
+        plugin->vtimer = g_timeout_add(VMON_INTERVAL, (GSourceFunc)vtimer_event, (gpointer)plugin);
 
         /* Display battery status */
-        update_icon(pt);
+        update_icon(plugin);
     }
     else
     {
-        pt->timer = 0;
-        pt->vtimer = 0;
+        plugin->timer = 0;
+        plugin->vtimer = 0;
     }
 
     /* Show the widget and return */
-    gtk_widget_show_all(pt->plugin);
-    return pt->plugin;
+    gtk_widget_show_all(plugin->plugin);
+    return plugin->plugin;
 }
 
-/* TBD. */
 FM_DEFINE_MODULE(lxpanel_gtk, x729batt)
 
 /* Plugin descriptor. */
