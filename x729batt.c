@@ -193,20 +193,22 @@ static int update_battery(x729BattPlugin *plugin, device_status_t *status)
 {
     *status = STATUS_UNKNOWN;
     battery *b = plugin->batt;
-    if (b)
+    if (!b)
     {
-        if (!battery_update(b))
+        b = battery_get();
+        plugin->batt = b;
+        if (!b)
             return 0;
-
-        if ((b->percentage <= LOW_BATTERY_PERCENT) &&
-            ((power_source_t)b->power_source == POW_BATTERY))
-            lxpanel_notify(plugin->panel, "WARNING: Low battery detected!\nPlease verify your power supply.");
-
-        *status = (device_status_t)b->device_status;
-        return 1;
     }
+    else if (!battery_update(b))
+        return 0;
 
-    return 0;
+    if ((b->percentage <= LOW_BATTERY_PERCENT) &&
+        ((power_source_t)b->power_source == POW_BATTERY))
+        lxpanel_notify(plugin->panel, "WARNING: Low battery detected!\nPlease verify your power supply.");
+
+    *status = (device_status_t)b->device_status;
+    return 1;
 }
 
 /* Draws the battery icon using the capacity-dependent color and fill level. */
@@ -384,10 +386,9 @@ static gboolean vtimer_event(x729BattPlugin *plugin)
         (power_source == POW_BATTERY))
     {
         lxpanel_notify(plugin->panel, "WARNING: Low voltage detected!\nPlease verify your power supply.");
-        return TRUE;
     }
 
-    return FALSE;
+    return TRUE;
 }
 
 /* Removes plugin timers and releases its context. */
@@ -423,21 +424,16 @@ static GtkWidget *x729batt_constructor(LXPanel *panel, config_setting_t *setting
     plugin->tray_icon = gtk_image_new();
     gtk_container_add(GTK_CONTAINER(plugin->plugin), plugin->tray_icon);
 
-    if (init_battery(plugin))
+    init_battery(plugin);
+
+    /* Start timed events even if the initial device read fails. */
+    plugin->timer = g_timeout_add(CMON_INTERVAL, (GSourceFunc)timer_event, (gpointer)plugin);
+    plugin->vtimer = g_timeout_add(VMON_INTERVAL, (GSourceFunc)vtimer_event, (gpointer)plugin);
+
+    if (plugin->batt)
     {
-        /* Start timed events to monitor status */
-        plugin->timer = g_timeout_add(CMON_INTERVAL, (GSourceFunc)timer_event, (gpointer)plugin);
-
-        /* Start timed events to monitor low voltage warnings */
-        plugin->vtimer = g_timeout_add(VMON_INTERVAL, (GSourceFunc)vtimer_event, (gpointer)plugin);
-
         /* Display battery status */
         update_icon(plugin);
-    }
-    else
-    {
-        plugin->timer = 0;
-        plugin->vtimer = 0;
     }
 
     /* Show the widget and return */

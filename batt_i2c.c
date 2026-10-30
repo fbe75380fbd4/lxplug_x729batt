@@ -33,7 +33,6 @@ enum
 static enum
 {
 	GPIO_SETUP_NOT_ATTEMPTED,
-	GPIO_SETUP_FAILED,
 	GPIO_SETUP_READY
 } gpio_setup_state;
 
@@ -221,16 +220,12 @@ int get_power_source()
 		if (wiringPiSetupGpio() == -1)
 		{
 			g_warning("Could not initialize WiringPi GPIO access.");
-			gpio_setup_state = GPIO_SETUP_FAILED;
 			return -1;
 		}
 
 		pinMode(BCM_GPIO_PIN, INPUT);
 		gpio_setup_state = GPIO_SETUP_READY;
 	}
-
-	if (gpio_setup_state != GPIO_SETUP_READY)
-		return -1;
 
 	int value = digitalRead(BCM_GPIO_PIN);
 
