@@ -1,3 +1,12 @@
+lxplug-x729batt (2.1.2-1) stable; urgency=low
+
+  * Fix battery status checks and handle sensor read failures safely.
+  * Retry battery and GPIO initialization after transient failures.
+  * Harden icon rendering and fix tray icon reference leak.
+  * Fix plugin installation path in the Debian package.
+
+ -- Enrique M <tyranitar.spider419@passinbox.com>  Thu, 29 Oct 2026 23:04:33 -0600
+
 lxplug-x729batt (2.1.1-1) stable; urgency=low   
 
   * Initial release

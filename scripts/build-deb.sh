@@ -10,7 +10,7 @@ if [ -z "$DEB_VERSION" ]; then
 fi
 
 # Install binaries
-sudo apt install dpkg-dev debhelper
+sudo apt install -y dpkg-dev debhelper
 
 PROJECT_NAME="lxplug-x729batt"
 PACKAGE_DIR="${PROJECT_NAME}-${DEB_VERSION}"
