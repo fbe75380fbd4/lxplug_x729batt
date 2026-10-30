@@ -51,7 +51,7 @@ typedef enum
 } powersource_t;
 
 /* Prototypes */
-static void convert_alpha(guchar *dest_data, int dest_stride, guchar *src_data, int src_stride, int src_x, int src_y, int width, int height);
+static gboolean convert_alpha(guchar *dest_data, int dest_stride, guchar *src_data, int src_stride, int src_x, int src_y, int width, int height);
 GdkPixbuf *gdk_pixbuf_get_from_surface(cairo_surface_t *surface, gint src_x, gint src_y, gint width, gint height);
 static int init_battery(x729BattPlugin *pt);
 static int update_battery(x729BattPlugin *pt, devicestatus_t *status);
@@ -61,51 +61,105 @@ static gboolean timer_event(x729BattPlugin *pt);
 static gboolean vtimer_event(x729BattPlugin *pt);
 
 /* gdk_pixbuf_get_from_surface function from GDK+3 */
-static void convert_alpha(guchar *dest_data, int dest_stride, guchar *src_data, int src_stride, int src_x, int src_y, int width, int height)
+static gboolean convert_alpha(guchar *dest_data, int dest_stride, guchar *src_data, int src_stride, int src_x, int src_y, int width, int height)
 {
     int x, y;
+    gsize row_size, src_x_offset, src_y_offset;
+    gsize last_src_row_offset, last_dest_row_offset;
 
-    src_data += src_stride * src_y + src_x * 4;
+    if (!dest_data || !src_data || dest_stride <= 0 || src_stride <= 0 ||
+        src_x < 0 || src_y < 0 || width <= 0 || height <= 0)
+        return FALSE;
+
+    if ((gsize)width > G_MAXSIZE / 4)
+        return FALSE;
+    row_size = (gsize)width * 4;
+    if (row_size > (gsize)dest_stride || row_size > (gsize)src_stride ||
+        (gsize)src_x > G_MAXSIZE / 4)
+        return FALSE;
+
+    src_x_offset = (gsize)src_x * 4;
+    if (src_x_offset > (gsize)src_stride - row_size ||
+        (gsize)(height - 1) > G_MAXSIZE / (gsize)dest_stride ||
+        (gsize)(height - 1) > G_MAXSIZE / (gsize)src_stride ||
+        (gsize)src_y > G_MAXSIZE / (gsize)src_stride)
+        return FALSE;
+
+    src_y_offset = (gsize)src_stride * src_y;
+    if (src_x_offset > G_MAXSIZE - src_y_offset)
+        return FALSE;
+
+    last_src_row_offset = (gsize)(height - 1) * src_stride;
+    last_dest_row_offset = (gsize)(height - 1) * dest_stride;
+    if (last_src_row_offset > G_MAXSIZE - src_y_offset - src_x_offset ||
+        row_size > G_MAXSIZE - src_y_offset - src_x_offset - last_src_row_offset ||
+        row_size > G_MAXSIZE - last_dest_row_offset)
+        return FALSE;
 
     for (y = 0; y < height; y++)
     {
-        guint32 *src = (guint32 *)src_data;
+        const guint32 *src = (const guint32 *)(src_data + src_y_offset +
+                                               (gsize)y * src_stride + src_x_offset);
+        guchar *dest_row = dest_data + (gsize)y * dest_stride;
 
         for (x = 0; x < width; x++)
         {
             guint alpha = src[x] >> 24;
+            gsize dest_offset = (gsize)x * 4;
 
             if (alpha == 0)
             {
-                dest_data[x * 4 + 0] = 0;
-                dest_data[x * 4 + 1] = 0;
-                dest_data[x * 4 + 2] = 0;
+                dest_row[dest_offset + 0] = 0;
+                dest_row[dest_offset + 1] = 0;
+                dest_row[dest_offset + 2] = 0;
             }
             else
             {
-                dest_data[x * 4 + 0] = (((src[x] & 0xff0000) >> 16) * 255 + alpha / 2) / alpha;
-                dest_data[x * 4 + 1] = (((src[x] & 0x00ff00) >> 8) * 255 + alpha / 2) / alpha;
-                dest_data[x * 4 + 2] = (((src[x] & 0x0000ff) >> 0) * 255 + alpha / 2) / alpha;
+                dest_row[dest_offset + 0] = (((src[x] & 0xff0000) >> 16) * 255 + alpha / 2) / alpha;
+                dest_row[dest_offset + 1] = (((src[x] & 0x00ff00) >> 8) * 255 + alpha / 2) / alpha;
+                dest_row[dest_offset + 2] = (((src[x] & 0x0000ff) >> 0) * 255 + alpha / 2) / alpha;
             }
-            dest_data[x * 4 + 3] = alpha;
+            dest_row[dest_offset + 3] = alpha;
         }
-
-        src_data += src_stride;
-        dest_data += dest_stride;
     }
+
+    return TRUE;
 }
 
 /* TBD */
 GdkPixbuf *gdk_pixbuf_get_from_surface(cairo_surface_t *surface, gint src_x, gint src_y, gint width, gint height)
 {
-    GdkPixbuf *dest = gdk_pixbuf_new(GDK_COLORSPACE_RGB, TRUE, 8, width, height);
+    GdkPixbuf *dest;
 
-    convert_alpha(gdk_pixbuf_get_pixels(dest),
-                  gdk_pixbuf_get_rowstride(dest),
-                  cairo_image_surface_get_data(surface),
-                  cairo_image_surface_get_stride(surface),
-                  0, 0,
-                  width, height);
+    if (!surface || cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS ||
+        cairo_surface_get_type(surface) != CAIRO_SURFACE_TYPE_IMAGE ||
+        cairo_image_surface_get_format(surface) != CAIRO_FORMAT_ARGB32 ||
+        width <= 0 || height <= 0 || src_x < 0 || src_y < 0 ||
+        src_x > cairo_image_surface_get_width(surface) - width ||
+        src_y > cairo_image_surface_get_height(surface) - height)
+    {
+        if (surface)
+            cairo_surface_destroy(surface);
+        return NULL;
+    }
+
+    cairo_surface_flush(surface);
+    dest = gdk_pixbuf_new(GDK_COLORSPACE_RGB, TRUE, 8, width, height);
+    if (!dest)
+    {
+        cairo_surface_destroy(surface);
+        return NULL;
+    }
+
+    if (!convert_alpha(gdk_pixbuf_get_pixels(dest),
+                       gdk_pixbuf_get_rowstride(dest),
+                       cairo_image_surface_get_data(surface),
+                       cairo_image_surface_get_stride(surface),
+                       src_x, src_y, width, height))
+    {
+        g_object_unref(dest);
+        dest = NULL;
+    }
 
     cairo_surface_destroy(surface);
     return dest;
@@ -149,12 +203,18 @@ static void draw_icon(x729BattPlugin *pt, int level)
 
     // calculate dimensions based on icon size
     ic = panel_get_icon_size(pt->panel);
+    if (ic <= 10)
+        return;
+
     w = ic < 36 ? 36 : ic;
-    h = ((w * 10) / 36) * 2; // force it to be even
-    if (h < 18)
-        h = 18;
-    if (h >= ic)
-        h = ic - 2;
+    gint64 height = ((gint64)w * 10 / 36) * 2;
+    if (height < 18)
+        height = 18;
+    if (height >= ic)
+        height = ic - 2;
+    if (height <= 8 || height > G_MAXINT)
+        return;
+    h = (gint)height;
 
     // set color based on level
     if (level <= 20)
@@ -181,7 +241,20 @@ static void draw_icon(x729BattPlugin *pt, int level)
 
     // create and clear the drawing surface
     cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+    if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS)
+    {
+        cairo_surface_destroy(surface);
+        return;
+    }
+
     cairo_t *cr = cairo_create(surface);
+    if (cairo_status(cr) != CAIRO_STATUS_SUCCESS)
+    {
+        cairo_destroy(cr);
+        cairo_surface_destroy(surface);
+        return;
+    }
+
     cairo_set_source_rgba(cr, 0, 0, 0, 0);
     cairo_rectangle(cr, 0, 0, w, h);
     cairo_fill(cr);
@@ -215,8 +288,7 @@ static void draw_icon(x729BattPlugin *pt, int level)
         f = w - 12;
     else
     {
-        f = (w - 12) * level;
-        f /= 97;
+        f = (gint)(((gint64)(w - 12) * level) / 97);
         if (f > w - 12)
             f = w - 12;
     }
@@ -226,6 +298,11 @@ static void draw_icon(x729BattPlugin *pt, int level)
 
     // create a pixbuf from the cairo surface
     GdkPixbuf *pixbuf = gdk_pixbuf_get_from_surface(surface, 0, 0, w, h);
+    if (!pixbuf)
+    {
+        cairo_destroy(cr);
+        return;
+    }
 
     // copy the pixbuf to the icon resource
     g_object_ref_sink(pt->tray_icon);
