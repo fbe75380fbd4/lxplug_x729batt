@@ -1,3 +1,10 @@
+## 2.1.2
+
+- Fixed battery status checks, sensor read handling, and I2C descriptor cleanup
+- Improved recovery from I2C and GPIO initialization failures
+- Hardened icon rendering and fixed a tray icon reference leak
+- Fixed the Debian package plugin install path
+
 ## 2.1.1
 
 - Added version.h
