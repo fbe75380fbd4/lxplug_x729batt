@@ -51,9 +51,9 @@ static int open_i2c()
 	if (file < 0)
 	{
 		if (errno == EACCES)
-			g_error("Run as root?");
+			g_warning("Run as root?");
 		else
-			g_error("Could not open file %s: %s", filename, strerror(errno));
+			g_warning("Could not open file %s: %s", filename, strerror(errno));
 	}
 	else
 		g_debug("Success opening file %s.", filename);
@@ -122,17 +122,20 @@ static int i2c_read_raw(unsigned int daddress, unsigned int *data)
 
 	if (read_i2c(file))
 	{
-		close(file);
-		g_error("Could not initialize I2C device.");
+		if (close(file) < 0)
+			g_warning("Could not close I2C device file: %s", strerror(errno));
+		return -8;
 	}
 
 	res = get_i2c_data(file, daddress);
+	int read_errno = errno;
 
-	close(file);
+	if (close(file) < 0)
+		g_warning("Could not close I2C device file: %s", strerror(errno));
 
 	if (res < 0)
 	{
-		g_error("I2C read failed.");
+		g_warning("I2C read failed: %s", strerror(read_errno));
 		return -4;
 	}
 	*data = res;
@@ -222,24 +225,33 @@ int get_powersource()
 }
 
 /* Updates device status, voltage and capacity */
-battery *battery_update(battery *b)
+int battery_update(battery *b)
 {
-	if (b == NULL)
-		b = battery_new();
+	g_return_val_if_fail(b != NULL, 0);
 
 	b->devicestatus = get_devicestatus();
 	if (b->devicestatus != 1)
-		g_error("x729 battery not found!");
+		return 0;
 
-	b->voltage = get_voltage();
+	float voltage = get_voltage();
+	if (voltage < 0.0f)
+	{
+		g_warning("Could not read x729 battery voltage.");
+		return 0;
+	}
 
-	b->percentage = get_capacity();
-	if (b->percentage > 100)
-		b->percentage = 100;
+	int percentage = get_capacity();
+	if (percentage < 0)
+	{
+		g_warning("Could not read x729 battery capacity.");
+		return 0;
+	}
 
+	b->voltage = voltage;
+	b->percentage = percentage > 100 ? 100 : percentage;
 	b->powersource = get_powersource();
 
-	return b;
+	return 1;
 }
 
 /* Retrieves battery information */
@@ -247,7 +259,11 @@ battery *battery_get()
 {
 	battery *b = battery_new();
 
-	battery_update(b);
+	if (!battery_update(b))
+	{
+		g_free(b);
+		return NULL;
+	}
 
 	return b;
 }

@@ -48,7 +48,7 @@ typedef struct battery
 
 /* Prototypes */
 battery *battery_get();
-battery *battery_update(battery *b);
+int battery_update(battery *b);
 int get_capacity();
 int get_devicestatus();
 int get_powersource();
