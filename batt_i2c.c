@@ -69,21 +69,21 @@ static int read_i2c(int file)
 	// check adapter functionality
 	if (ioctl(file, I2C_FUNCS, &funcs) < 0)
 	{
-		g_error("Could not get the adapter functionality matrix: %s", strerror(errno));
+		g_warning("Could not get the adapter functionality matrix: %s", strerror(errno));
 		return -1;
 	}
 
 	// check read word capability
 	if (!(funcs & I2C_FUNC_SMBUS_READ_WORD_DATA))
 	{
-		g_error("Adapter does not have SMBus read word capability.");
+		g_warning("Adapter does not have SMBus read word capability.");
 		return -1;
 	}
 
 	// Attempt binding to address
 	if (ioctl(file, I2C_SLAVE, I2C_DEV_ADDR) < 0)
 	{
-		g_error("Could not set address to 0x%02x: %s", I2C_DEV_ADDR, strerror(errno));
+		g_warning("Could not set address to 0x%02x: %s", I2C_DEV_ADDR, strerror(errno));
 		return -1;
 	}
 
@@ -117,8 +117,14 @@ static int i2c_read_raw(unsigned int daddress, unsigned int *data)
 
 	file = open_i2c();
 
-	if (file < 0 || read_i2c(file))
+	if (file < 0)
 		return -8;
+
+	if (read_i2c(file))
+	{
+		close(file);
+		g_error("Could not initialize I2C device.");
+	}
 
 	res = get_i2c_data(file, daddress);
 
@@ -177,8 +183,12 @@ float get_voltage()
 /* Returns device status */
 int get_devicestatus()
 {
-	if (open_i2c() < 0)
+	int file = open_i2c();
+	if (file < 0)
 		return 0; // Unknown
+
+	if (close(file) < 0)
+		g_warning("Could not close I2C device file: %s", strerror(errno));
 
 	g_info("x729 is present.");
 
