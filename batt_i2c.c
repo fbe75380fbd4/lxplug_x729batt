@@ -24,6 +24,12 @@
 #include <unistd.h>
 #include <wiringPi.h>
 
+enum
+{
+	I2C_ERROR_OPEN_OR_SETUP = -8,
+	I2C_ERROR_READ = -4
+};
+
 static enum
 {
 	GPIO_SETUP_NOT_ATTEMPTED,
@@ -125,13 +131,13 @@ static int i2c_read_raw(unsigned int daddress, unsigned int *data)
 	file = open_i2c();
 
 	if (file < 0)
-		return -8;
+		return I2C_ERROR_OPEN_OR_SETUP;
 
 	if (read_i2c(file))
 	{
 		if (close(file) < 0)
 			g_warning("Could not close I2C device file: %s", strerror(errno));
-		return -8;
+		return I2C_ERROR_OPEN_OR_SETUP;
 	}
 
 	res = get_i2c_data(file, daddress);
@@ -143,7 +149,7 @@ static int i2c_read_raw(unsigned int daddress, unsigned int *data)
 	if (res < 0)
 	{
 		g_warning("I2C read failed: %s", strerror(read_errno));
-		return -4;
+		return I2C_ERROR_READ;
 	}
 	*data = res;
 
