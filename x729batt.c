@@ -323,7 +323,6 @@ static void draw_icon(x729BattPlugin *plugin, int level)
     }
 
     // copy the pixbuf to the icon resource
-    g_object_ref_sink(plugin->tray_icon);
     gtk_image_set_from_pixbuf(GTK_IMAGE(plugin->tray_icon), pixbuf);
 
     g_object_unref(pixbuf);
