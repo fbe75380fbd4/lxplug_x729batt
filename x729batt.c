@@ -258,8 +258,10 @@ static void update_icon(x729BattPlugin *pt)
     // fill the battery symbol and create the tooltip
     if (powersource == POW_BATTERY)
         snprintf(str, sizeof(str), "Capacity : %01d%%\nVoltage : %02.02fV\nPower source : Battery", capacity, voltage);
-    else
+    else if (powersource == POW_ADAPTER)
         snprintf(str, sizeof(str), "Capacity : %01d%%\nVoltage : %02.02fV\nPower source : AC adapter", capacity, voltage);
+    else
+        snprintf(str, sizeof(str), "Capacity : %01d%%\nVoltage : %02.02fV\nPower source : Unknown", capacity, voltage);
     draw_icon(pt, capacity);
 
     // set the tooltip

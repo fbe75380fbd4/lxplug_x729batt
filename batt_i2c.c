@@ -199,7 +199,11 @@ int get_devicestatus()
 int get_powersource()
 {
 	// uses BCM numbering of the GPIOs and directly accesses the GPIO registers.
-	wiringPiSetupGpio();
+	if (wiringPiSetupGpio() == -1)
+	{
+		g_warning("Could not initialize WiringPi GPIO access.");
+		return -1;
+	}
 
   	// set BCM GPIO pin to input
   	pinMode(BCM_GPIO_PIN, INPUT);
